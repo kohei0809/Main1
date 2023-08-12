@@ -94,6 +94,9 @@ def batch_obs(
 
     for obs in observations:
         for sensor in obs:
+            if sensor == "semantic":
+                obs[sensor] = obs[sensor].astype(np.int64)     
+            
             batch[sensor].append(_to_tensor(obs[sensor]))
 
     for sensor in batch:

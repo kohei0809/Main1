@@ -6,7 +6,7 @@
 
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.tasks.nav import _try_register_nav_task
+from habitat.tasks.nav import _try_register_nav_task, _try_register_info_task, _try_register_maximuminfo_task
 
 
 def make_task(id_task, **kwargs):
@@ -20,3 +20,5 @@ def make_task(id_task, **kwargs):
 
 
 _try_register_nav_task()
+_try_register_info_task()
+_try_register_maximuminfo_task()

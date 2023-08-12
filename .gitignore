@@ -192,3 +192,6 @@ tb/
 train.log
 cpt/
 exp/
+*.csv
+*.png
+.txt

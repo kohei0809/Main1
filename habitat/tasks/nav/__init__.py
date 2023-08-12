@@ -25,3 +25,41 @@ def _try_register_nav_task():
         class NavigationTaskImportError(EmbodiedTask):
             def __init__(self, *args, **kwargs):
                 raise navtask_import_error
+            
+    
+def _try_register_info_task():
+    try:
+        from habitat.tasks.nav.nav import InformationTask
+
+        has_navtask = True
+    except ImportError as e:
+        has_navtask = False
+        navtask_import_error = e
+
+    if has_navtask:
+        from habitat.tasks.nav.nav import InformationTask
+    else:
+
+        @registry.register_task(name="Info-v0")
+        class NavigationTaskImportError(EmbodiedTask):
+            def __init__(self, *args, **kwargs):
+                raise navtask_import_error
+            
+def _try_register_maximuminfo_task():
+    try:
+        from habitat.tasks.nav.maximum_info_task import MaximumInformationTask
+
+        has_navtask = True
+    except ImportError as e:
+        has_navtask = False
+        navtask_import_error = e
+
+    if has_navtask:
+        from habitat.tasks.nav.maximum_info_task import MaximumInformationTask
+    else:
+
+        @registry.register_task(name="Info-v0")
+        class NavigationTaskImportError(EmbodiedTask):
+            def __init__(self, *args, **kwargs):
+                raise navtask_import_error
+

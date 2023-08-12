@@ -113,7 +113,7 @@ class HabitatSimDepthSensor(DepthSensor):
         check_sim_obs(obs, self)
 
         if isinstance(obs, np.ndarray):
-            obs = np.clip(obs, self.config.MIN_DEPTH, self.config.MAX_DEPTH)
+            #obs = np.clip(obs, self.config.MIN_DEPTH, self.config.MAX_DEPTH)
 
             obs = np.expand_dims(
                 obs, axis=2
@@ -142,10 +142,10 @@ class HabitatSimSemanticSensor(SemanticSensor):
 
     def _get_observation_space(self, *args: Any, **kwargs: Any):
         return spaces.Box(
-            low=np.iinfo(np.uint32).min,
-            high=np.iinfo(np.uint32).max,
+            low=0,
+            high=np.iinfo(np.int64).max,
             shape=(self.config.HEIGHT, self.config.WIDTH),
-            dtype=np.uint32,
+            dtype=np.int64,
         )
 
     def get_observation(self, sim_obs):

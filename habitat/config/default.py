@@ -74,6 +74,8 @@ ACTIONS.LOOK_DOWN = CN()
 ACTIONS.LOOK_DOWN.TYPE = "LookDownAction"
 ACTIONS.FOUND = CN()
 ACTIONS.FOUND.TYPE = "FoundObjectAction"
+ACTIONS.TAKE_PICTURE = CN()
+ACTIONS.TAKE_PICTURE.TYPE = "TakePicture"
 
 
 ACTIONS.TELEPORT = CN()
@@ -138,6 +140,23 @@ _C.TASK.GPS_SENSOR.DIMENSIONALITY = 2
 _C.TASK.PROXIMITY_SENSOR = CN()
 _C.TASK.PROXIMITY_SENSOR.TYPE = "ProximitySensor"
 _C.TASK.PROXIMITY_SENSOR.MAX_DETECTION_RADIUS = 2.0
+# -----------------------------------------------------------------------------
+# PICTURE MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.PICTURE = CN()
+_C.TASK.PICTURE.TYPE = "Picture"
+# -----------------------------------------------------------------------------
+# CI MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.CI = CN()
+_C.TASK.CI.TYPE = "CI"
+_C.TASK.CI.LOW_REGION_WEIGHT: 1.0
+_C.TASK.CI.MID_REGION_WEIGHT: 3.0
+_C.TASK.CI.HIGH_REGION_WEIGHT: 5.0
+_C.TASK.CI.LOW_CATEGORY_VALUE: -0.01
+_C.TASK.CI.MID_CATEGORY_VALUE: 1.0
+_C.TASK.CI.HIGH_CATEGORY_VALUE: 2.0
+
 # -----------------------------------------------------------------------------
 # SUCCESS MEASUREMENT
 # -----------------------------------------------------------------------------

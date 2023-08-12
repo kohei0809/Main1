@@ -48,6 +48,8 @@ _C.EVAL.USE_CKPT_CONFIG = True
 # -----------------------------------------------------------------------------
 _C.RL = CN()
 _C.RL.REWARD_MEASURE = "distance_to_currgoal"
+_C.RL.TAKE_PICTURE_MEASURE = "picture"
+_C.RL.PICTURE_MEASURE = "ci"
 _C.RL.SUCCESS_MEASURE = "success"
 _C.RL.SUBSUCCESS_MEASURE = "sub_success"
 _C.RL.SUCCESS_REWARD = 10.0
@@ -55,6 +57,7 @@ _C.RL.SLACK_REWARD = -0.01
 _C.RL.OBJECT_CATEGORY_EMBEDDING_SIZE = 32
 _C.RL.PREVIOUS_ACTION_EMBEDDING_SIZE = 32
 _C.RL.PREVIOUS_ACTION = True
+_C.RL.USE_AREA_REWARD = True
 # -----------------------------------------------------------------------------
 # PROXIMAL POLICY OPTIMIZATION (PPO)
 # -----------------------------------------------------------------------------

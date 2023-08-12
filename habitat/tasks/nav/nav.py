@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 import attr
 import numpy as np
 from gym import spaces
+import math
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
@@ -78,6 +79,9 @@ class RoomGoal(NavigationGoal):
     room_id: str = attr.ib(default=None, validator=not_none_validator)
     room_name: Optional[str] = None
 
+@attr.s(auto_attribs=True, kw_only=True)
+class MaximumInformationEpisode(Episode):
+    start_room: Optional[str] = None
 
 @attr.s(auto_attribs=True, kw_only=True)
 class NavigationEpisode(Episode):
@@ -414,7 +418,138 @@ class ProximitySensor(Sensor):
         return self._sim.distance_to_closest_obstacle(
             current_position, self._max_detection_radius
         )
+        
+@registry.register_measure
+class Picture(Measure):
+    r"""Whether or not the agent take picture
+    """
 
+    cls_uuid: str = "picture"
+
+    def __init__(
+        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+    ):
+        self._sim = sim
+        self._config = config
+
+        super().__init__()
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return self.cls_uuid
+
+    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+        self.update_metric(*args, episode=episode, task=task, **kwargs)
+
+    def update_metric(
+        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+    ):
+        if (
+            hasattr(task, "is_found_called")
+            and task.is_found_called
+        ):
+            #self._metric += 1
+        else:
+            self._metric = 0
+            
+@registry.register_measure
+class CI(Measure):
+    cls_uuid: str = "ci"
+
+    def __init__(
+        self, sim: Simulator, config: Config, *args: Any, **kwargs: Any
+    ):
+        self._sim = sim
+        self._config = config
+        #self._num_picture = 0
+        super().__init__(**kwargs)
+
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return self.cls_uuid
+
+    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+        task.measurements.check_measure_dependencies(
+            self.uuid, [Picture.cls_uuid]
+        )
+        self.update_metric(*args, episode=episode, task=task, **kwargs)
+    
+    def update_metric(
+        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+    ):
+        take_picture = task.measurements.measures[
+            Picture.cls_uuid
+        ].get_metric()
+
+        #if take_picture > self._num_picture:
+            self._metric = self._calCI(episode, task)
+        #    self._num_picture += 1
+        else:
+            self._metric = 0 
+            
+    def _to_category_id(self, obs):
+        scene = self._sim._sim.semantic_scene
+        instance_id_to_label_id = {int(obj.id.split("_")[-1]): obj.category.index() for obj in scene.objects}
+        mapping = np.array([ instance_id_to_label_id[i] for i in range(len(instance_id_to_label_id)) ])
+
+        semantic_obs = np.take(mapping, obs)
+        semantic_obs[semantic_obs>=40] = 0
+        semantic_obs[semantic_obs<0] = 0
+        return semantic_obs
+
+        
+    def _calCI(self, *args: Any, **kwargs: Any):
+        observation = self._sim.get_observations_at()
+        semantic_obs = self._to_category_id(observation["semantic"])
+        depth_obs = observation["depth"]
+        H = semantic_obs.shape[0]
+        W = semantic_obs.shape[1]
+        size = H * W
+    
+        #objectのスコア別リスト
+        #void, wall, floor, door, stairs, ceiling, column, railing
+        score0 = [0, 1, 2, 4, 16, 17, 24, 30] 
+        #chair, table, picture, cabinet, window, sofa, bed, curtain, chest_of_drawers, sink, toilet, stool, shower, bathtub, counter, lighting, beam, shelving, blinds, seating, objects
+        score1 = [3, 5, 6, 7, 9, 10, 11, 12, 13, 15, 18, 19, 23, 25, 26, 28, 29, 31, 32, 34, 39]
+        #cushion, plant, towel, mirror, tv_monitor, fireplace, gym_equipment, board_panel, furniture, appliances, clothes
+        score2 = [8, 14, 20, 21, 22, 27, 33, 35, 36, 37, 38]
+    
+        #objectのcategoryリスト
+        category = []
+    
+        ci = 0.0
+        for i in range(H):
+            for j in range(W):
+                #領域スコア
+                if i >= 96 and i <= 159 and j >= 96 and j <= 159:
+                    w = self._config.HIGH_REGION_WEIGHT
+                elif i >= 64 and i <= 191 and j >= 64 and j <= 191:
+                    w = self._config.MID_REGION_WEIGHT
+                else:
+                    w = self._config.LOW_REGION_WEIGHT
+            
+                #オブジェクトまでの距離
+                d = math.sqrt(depth_obs[i][j])
+                d = max(d, 1.0)
+                
+                obs = semantic_obs[i][j]
+                if obs in score0:
+                    #オブジェクトのスコア
+                    v = self._config.LOW_CATEGORY_VALUE
+                else:
+                    if obs not in category:
+                        category.append(obs)
+                    if obs in score1:
+                        v = self._config.MID_CATEGORY_VALUE
+                    else:
+                        v = self._config.HIGH_CATEGORY_VALUE
+                
+                score = w * v / d
+                ci += score
+        
+        ci *= len(category)
+        ci /= size
+        return ci
+        
 
 @registry.register_measure
 class Success(Measure):
@@ -764,8 +899,10 @@ class RawMetrics(Measure):
         self._previous_position = self._sim.get_agent_state().position.tolist()
 
         self._start_end_episode_distance = 0
+        """
         self._start_subgoal_episode_distance = []
         self._start_subgoal_agent_distance = []
+   
         for goal_number in range(len(episode.goals) ):  # Find distances between successive goals and keep adding them
             if goal_number == 0:
                 self._start_end_episode_distance += self._sim.geodesic_distance(
@@ -777,12 +914,15 @@ class RawMetrics(Measure):
                     episode.goals[goal_number - 1].position, episode.goals[goal_number].position
                 )
                 self._start_subgoal_episode_distance.append(self._start_end_episode_distance)
+        """
 
         self._agent_episode_distance = 0.0
         self._metric = None
+        """
         task.measurements.check_measure_dependencies(
             self.uuid, [EpisodeLength.cls_uuid, MSPL.cls_uuid, PSPL.cls_uuid, DistanceToMultiGoal.cls_uuid, DistanceToCurrGoal.cls_uuid, SubSuccess.cls_uuid, Success.cls_uuid, PercentageSuccess.cls_uuid]
         )
+        """
         self.update_metric(*args, episode=episode, task=task, **kwargs)
         ##
 
@@ -793,18 +933,20 @@ class RawMetrics(Measure):
 
     def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
         current_position = self._sim.get_agent_state().position.tolist()
+        """
         ep_success = task.measurements.measures[Success.cls_uuid].get_metric()
         p_success = task.measurements.measures[PercentageSuccess.cls_uuid].get_metric()
         distance_to_curr_subgoal = task.measurements.measures[DistanceToCurrGoal.cls_uuid].get_metric()
         ep_sub_success = task.measurements.measures[SubSuccess.cls_uuid].get_metric()
-
+        """
         self._agent_episode_distance += self._euclidean_distance(
             current_position, self._previous_position
         )
         self._previous_position = current_position
+        """
         if ep_sub_success:
             self._start_subgoal_agent_distance.append(self._agent_episode_distance)
-
+        
         self._metric = {
             'success': ep_success,
             'percentage_success': p_success,
@@ -816,6 +958,12 @@ class RawMetrics(Measure):
             'distance_to_multi_goal': task.measurements.measures[DistanceToMultiGoal.cls_uuid].get_metric(),
             'MSPL': task.measurements.measures[MSPL.cls_uuid].get_metric(),
             'PSPL': task.measurements.measures[PSPL.cls_uuid].get_metric(),
+            'episode_lenth': task.measurements.measures[EpisodeLength.cls_uuid].get_metric()
+        }
+        """
+        
+        self._metric = {
+            'agent_path_length': self._agent_episode_distance,
             'episode_lenth': task.measurements.measures[EpisodeLength.cls_uuid].get_metric()
         }
 
@@ -1631,6 +1779,21 @@ class StopAction(SimulatorTaskAction):
         task.is_stop_called = True
         task.is_found_called = False ##C
         return self._sim.get_observations_at()
+    
+@registry.register_task_action
+class TakePicture(SimulatorTaskAction):
+    name: str = "TAKE_PICTURE"
+
+    def reset(self, *args: Any, task: EmbodiedTask, **kwargs: Any):
+        task.is_stop_called = False
+        task.is_found_called = False ##C
+
+    def step(self, *args: Any, task: EmbodiedTask, **kwargs: Any):
+        r"""Update ``_metric``, this method is called from ``Env`` on each
+        ``step``.
+        """
+        task.is_found_called = True
+        return self._sim.get_observations_at()
 
 
 @registry.register_task_action
@@ -1721,6 +1884,21 @@ class TeleportAction(SimulatorTaskAction):
 
 @registry.register_task(name="Nav-v0")
 class NavigationTask(EmbodiedTask):
+    def __init__(
+        self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
+    ) -> None:
+        super().__init__(config=config, sim=sim, dataset=dataset)
+        
+    def overwrite_sim_config(
+        self, sim_config: Any, episode: Type[Episode]
+    ) -> Any:
+        return merge_sim_episode_config(sim_config, episode)
+
+    def _check_episode_is_active(self, *args: Any, **kwargs: Any) -> bool:
+        return not getattr(self, "is_stop_called", False)
+    
+@registry.register_task(name="Info-v0")
+class InformationTask(EmbodiedTask):
     def __init__(
         self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
     ) -> None:

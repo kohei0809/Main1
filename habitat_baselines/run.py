@@ -87,8 +87,49 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
     elif run_type == "eval":
         trainer.eval()
 
+def test():
+    exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo.yaml"
+    agent_type = "oracle-ego"
+    run_type = "train"
+    
+    config = get_config(exp_config)
+    random.seed(config.TASK_CONFIG.SEED)
+    np.random.seed(config.TASK_CONFIG.SEED)
+    
+    config.defrost()
+    config.TRAINER_NAME = agent_type
+    config.TASK_CONFIG.TRAINER_NAME = agent_type
+    config.freeze()
+    
+    if agent_type in ["oracle", "oracle-ego", "no-map"]:
+        trainer_init = baseline_registry.get_trainer("oracle")
+        config.defrost()
+        config.RL.PPO.hidden_size = 512
+        config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = False
+        config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = 0.5
+        config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = 5.0
+        config.TASK_CONFIG.SIMULATOR.AGENT_0.HEIGHT = 1.5
+        if agent_type == "oracle-ego":
+            config.TASK_CONFIG.TASK.MEASUREMENTS.append('FOW_MAP')
+        config.freeze()
+    else:
+        trainer_init = baseline_registry.get_trainer("non-oracle")
+        config.defrost()
+        config.RL.PPO.hidden_size = 512
+        config.freeze()
+        
+    assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
+    trainer = trainer_init(config)
+    
+    if run_type == "train":
+        trainer.train()
+    elif run_type == "eval":
+        trainer.eval()
+        
+
 if __name__ == "__main__":
-    main()
+    #main()
+    test()
 
     #MIN_DEPTH: 0.5
     #MAX_DEPTH: 5.0

@@ -20,7 +20,8 @@ import torch_scatter
 import tqdm
 from torch.optim.lr_scheduler import LambdaLR
 
-from habitat import Config, logger
+from habitat import Config
+from habitat.core.logging import logger
 from habitat.utils.visualizations.utils import observations_to_image
 from habitat_baselines.common.base_trainer import BaseRLTrainerNonOracle, BaseRLTrainerOracle
 from habitat_baselines.common.baseline_registry import baseline_registry
@@ -33,7 +34,7 @@ from habitat_baselines.common.utils import (
     generate_video,
     linear_decay,
 )
-from habitat_baselines.rl.ppo import PPONonOracle, PPOOracle, BaselinePolicyNonOracle, BaselinePolicyOracle
+from habitat_baselines.rl.ppo import PPONonOracle, PPOOracle, BaselinePolicyNonOracle, BaselinePolicyOracle, ProposedPolicyOracle
 
 
 @baseline_registry.register_trainer(name="non-oracle")
@@ -921,7 +922,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             None
         """
         logger.add_filehandler(self.config.LOG_FILE)
-
+        """
         self.actor_critic = BaselinePolicyOracle(
             agent_type = self.config.TRAINER_NAME,
             observation_space=self.envs.observation_spaces[0],
@@ -930,6 +931,16 @@ class PPOTrainerO(BaseRLTrainerOracle):
             goal_sensor_uuid=self.config.TASK_CONFIG.TASK.GOAL_SENSOR_UUID,
             device=self.device,
             object_category_embedding_size=self.config.RL.OBJECT_CATEGORY_EMBEDDING_SIZE,
+            previous_action_embedding_size=self.config.RL.PREVIOUS_ACTION_EMBEDDING_SIZE,
+            use_previous_action=self.config.RL.PREVIOUS_ACTION
+        )
+        """
+        self.actor_critic = ProposedPolicyOracle(
+            agent_type = self.config.TRAINER_NAME,
+            observation_space=self.envs.observation_spaces[0],
+            action_space=self.envs.action_spaces[0],
+            hidden_size=ppo_cfg.hidden_size,
+            device=self.device,
             previous_action_embedding_size=self.config.RL.PREVIOUS_ACTION_EMBEDDING_SIZE,
             use_previous_action=self.config.RL.PREVIOUS_ACTION
         )
@@ -1290,13 +1301,18 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 }
 
                 if len(metrics) > 0:
+                    """
                     writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], count_steps)
                     writer.add_scalar("metrics/success", metrics["success"], count_steps)
                     writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
                     writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
-
+                    """
+                    writer.add_scalar("metrics/picture", metrics["picture"], count_steps)
+                    writer.add_scalar("metrics/ci", metrics["ci"], count_steps)
+                    writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
+                    
                 writer.add_scalar("train/losses_value", value_loss, count_steps)
                 writer.add_scalar("train/losses_policy", action_loss, count_steps)
 

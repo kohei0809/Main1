@@ -9,6 +9,7 @@ from habitat.core.registry import registry
 from habitat.datasets.multi_nav import _try_register_multinavdatasetv1
 from habitat.datasets.object_nav import _try_register_objectnavdatasetv1
 from habitat.datasets.pointnav import _try_register_pointnavdatasetv1
+from habitat.datasets.maximum_info import _try_register_maximuminfodatasetv1
 
 
 def make_dataset(id_dataset, **kwargs):
@@ -22,3 +23,4 @@ def make_dataset(id_dataset, **kwargs):
 _try_register_multinavdatasetv1()
 _try_register_objectnavdatasetv1()
 _try_register_pointnavdatasetv1()
+_try_register_maximuminfodatasetv1()

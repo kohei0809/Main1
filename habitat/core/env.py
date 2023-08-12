@@ -63,6 +63,12 @@ class Env:
     _episode_start_time: Optional[float]
     _episode_over: bool
 
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def __init__(
         self, config: Config, dataset: Optional[Dataset] = None
     ) -> None:
@@ -131,6 +137,7 @@ class Env:
         self._elapsed_steps = 0
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
+
         if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             with open('oracle_maps/map300.pickle', 'rb') as handle:
                 self.mapCache = pickle.load(handle)
@@ -248,16 +255,6 @@ class Env:
         for objid in self._sim._sim.get_existing_object_ids():  
             self._sim._sim.remove_object(objid)
 
-        # Insert object here
-        object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2,
-            'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7
-        }
-        for i in range(len(self.current_episode.goals)):
-            current_goal = self.current_episode.goals[i].object_category
-            dataset_index = object_to_datset_mapping[current_goal]
-            ind = self._sim._sim.add_object(dataset_index)
-            self._sim._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
-
         observations = self.task.reset(episode=self.current_episode)
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
@@ -271,12 +268,14 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+            """
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
                 grid_loc = self.conv_grid(loc0, loc2)
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
                 self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, 1] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+            """
 
             currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
 
@@ -349,11 +348,13 @@ class Env:
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
 
         ##Terminates episode if wrong found is called
+        """
         if self.task.is_found_called == True and \
             self.task.measurements.measures[
             "sub_success"
         ].get_metric() == 0:
             self.task._is_episode_active = False
+        """
 
         self._update_step_stats()
         return observations
