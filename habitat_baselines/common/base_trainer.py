@@ -244,7 +244,7 @@ class BaseRLTrainerOracle(BaseTrainer):
     def train(self) -> None:
         raise NotImplementedError
 
-    def eval(self) -> None:
+    def eval(self, log_manager, date) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
         is specified in Trainer class that inherits from BaseRLTrainer
 
@@ -274,7 +274,7 @@ class BaseRLTrainerOracle(BaseTrainer):
                 self._eval_checkpoint(self.config.EVAL_CKPT_PATH_DIR, writer)
             else:
                 # evaluate multiple checkpoints in order
-                prev_ckpt_ind = -1
+                prev_ckpt_ind = 176
                 while True:
                     current_ckpt = None
                     while current_ckpt is None:
@@ -287,6 +287,8 @@ class BaseRLTrainerOracle(BaseTrainer):
                     self._eval_checkpoint(
                         checkpoint_path=current_ckpt,
                         writer=writer,
+                        log_manager=log_manager,
+                        date=date,
                         checkpoint_index=prev_ckpt_ind,
                     )
 

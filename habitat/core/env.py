@@ -137,7 +137,7 @@ class Env:
         self._elapsed_steps = 0
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
-
+        
         if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             with open('oracle_maps/map300.pickle', 'rb') as handle:
                 self.mapCache = pickle.load(handle)
@@ -268,15 +268,6 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            """
-            for i in range(len(self.current_episode.goals)):
-                loc0 = self.current_episode.goals[i].position[0]
-                loc2 = self.current_episode.goals[i].position[2]
-                grid_loc = self.conv_grid(loc0, loc2)
-                objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
-                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, 1] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
-            """
-
             currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
 
             if self._config.TRAINER_NAME == "oracle-ego":
@@ -346,15 +337,6 @@ class Env:
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
-
-        ##Terminates episode if wrong found is called
-        """
-        if self.task.is_found_called == True and \
-            self.task.measurements.measures[
-            "sub_success"
-        ].get_metric() == 0:
-            self.task._is_episode_active = False
-        """
 
         self._update_step_stats()
         return observations

@@ -11,10 +11,15 @@ in habitat. Customized environments should be registered using
 """
 
 from typing import Optional, Type
+from utils.log_manager import LogManager
+from utils.log_writer import LogWriter
+import sys
 
+from habitat.core.logging import logger
 import habitat
 from habitat import Config, Dataset
 from habitat_baselines.common.baseline_registry import baseline_registry
+from habitat.utils.visualizations import maps
 
 
 def get_env_class(env_name: str) -> Type[habitat.RLEnv]:
@@ -135,26 +140,45 @@ class InfoRLEnv(habitat.RLEnv):
 
     def get_reward(self, observations, **kwargs):
         reward = self._rl_config.SLACK_REWARD
+        ci = -sys.float_info.max
 
         #観測領域のreward
-        current_measure = self._env.get_metrics()[self._reward_measure_name].sum() * 0.08 * 0.08 
+        exp_area = self._env.get_metrics()[self._reward_measure_name].sum() 
+        current_measure = exp_area * 0.8 * 0.8 * 0.1
+        """
+        logger.info("AREA: " + str(exp_area) + "," + str(current_measure))
+        logger.info(current_measure - self._previous_measure)
+        top_down_map = self._env.task.sceneMap
+        count = 0
+        for i in range(top_down_map.shape[0]):
+            for j in range(top_down_map.shape[1]):
+                if top_down_map[i][j] != maps.MAP_INVALID_POINT:
+                    count += 1
+                
+        logger.info("TOP_DOWN_MAP: " + str(count))
+        logger.info(str(current_measure/count*100) + "%")
+        """
 
-        reward += current_measure - self._previous_measure
+        area_reward = current_measure - self._previous_measure
+        reward += area_reward
         self._previous_measure = current_measure
+        matrics = None
 
         if self._take_picture():
-            reward += self._env.get_metrics()[self._picture_measure_name]
+            measure = self._env.get_metrics()[self._picture_measure_name]
+            ci, matrics = measure[0], measure[1]
+            #reward += metrics
         elif self._env.task.is_found_called and self._rl_config.FALSE_FOUND_PENALTY:
             reward -= self._rl_config.FALSE_FOUND_PENALTY_VALUE
 
-        return reward
+        return [reward, ci, current_measure], matrics
 
     def _take_picture(self):
         return self._env.get_metrics()[self._take_picture_name]
 
     def get_done(self, observations):
         done = False
-        if self._env.episode_over or self._take_picture():
+        if self._env.episode_over:
             done = True
         return done
 

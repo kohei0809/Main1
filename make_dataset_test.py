@@ -13,10 +13,9 @@ from habitat_sim.utils.common import d3_40_colors_rgb
 from habitat_baselines.config.default import get_config  
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
-#from habitat.datasets.pointnav.pointnav_dataset import PointNavDatasetV1
 from habitat.datasets.maximum_info.maximuminfo_dataset import MaximumInfoDatasetV1
 from habitat.datasets.maximum_info.maximuminfo_generator import generate_maximuminfo_episode
-from habitat.core.env_point import Env
+from habitat.core.env import Env
 
    
 if __name__ == '__main__':
@@ -40,13 +39,13 @@ if __name__ == '__main__':
     
     dir_path = "data/scene_datasets/mp3d"
     dirs = [f for f in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, f))]
-    train_scene_num = 20
-    val_scene_num = 10
-    test_scene_num = 15
+    train_scene_num = 61
+    val_scene_num = 11
+    test_scene_num = 18
     episode_num = 20000
     
     i = 0
-    dataset_path = "data/datasets/maximum/"
+    dataset_path = "data/datasets/v2/maximum/"
     dataset = MaximumInfoDatasetV1()
     split = ""
     while(True):
@@ -64,17 +63,18 @@ if __name__ == '__main__':
                 dataset = MaximumInfoDatasetV1()
                     
             split = "val"
-            episode_num = 5000
+            episode_num = 200
         elif i < train_scene_num+val_scene_num+test_scene_num:
             if i == train_scene_num+val_scene_num:
                 #datasetを.gzに圧縮
                 with gzip.open(dataset_path + split + "/" + split +  ".json.gz", "wt") as f:
+                    random.shuffle(dataset.episodes)
                     f.write(dataset.to_json())
                     
                 dataset = MaximumInfoDatasetV1()
                 
             split = "test"
-            episode_num = 5000
+            episode_num = 500
         else:
             break
             

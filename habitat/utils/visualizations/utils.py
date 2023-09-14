@@ -184,8 +184,8 @@ def draw_found(view: np.ndarray, alpha: float = 1) -> np.ndarray:
     view[mask] = (alpha * np.array([0, 0, 255]) + (1.0 - alpha) * view)[mask]
     return view
 
-def observations_to_image(observation: Dict, projected_features: np.ndarray, egocentric_projection: np.ndarray, global_map: np.ndarray, info: Dict, action: np.ndarray) -> np.ndarray:
-# def observations_to_image(observation: Dict, info: Dict, action: np.ndarray) -> np.ndarray:
+#def observations_to_image(observation: Dict, projected_features: np.ndarray, egocentric_projection: np.ndarray, global_map: np.ndarray, info: Dict, action: np.ndarray) -> np.ndarray:
+def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max=5.0, min=0.5) -> np.ndarray:
     r"""Generate image of single frame from observation and info
     returned from a single environment step().
 
@@ -208,6 +208,7 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray, ego
 
     # draw depth map if observation has depth info
     if "depth" in observation:
+        observation["depth"] = (observation["depth"] - min) / (max - min)
         observation_size = observation["depth"].shape[0]
         depth_map = observation["depth"].squeeze() * 255.0
         if not isinstance(depth_map, np.ndarray):
@@ -217,28 +218,28 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray, ego
         depth_map = np.stack([depth_map for _ in range(3)], axis=2)
         egocentric_view.append(depth_map)
 
-    projected_features = cv2.resize(
-        projected_features,
-        depth_map.shape[:2],
-        interpolation=cv2.INTER_CUBIC,
-    )
-    projected_features /= np.max(projected_features)
-    projected_features  = cv2.applyColorMap(np.uint8(255 * projected_features), cv2.COLORMAP_JET)
-    egocentric_view.append(projected_features)
-
-    egocentric_projection = cv2.resize(
-        egocentric_projection,
-        depth_map.shape[:2],
-        interpolation=cv2.INTER_CUBIC,
-    )
-    egocentric_view.append(egocentric_projection)
-
-    global_map = cv2.resize(
-        global_map,
-        depth_map.shape[:2],
-        interpolation=cv2.INTER_CUBIC,
-    )
-    egocentric_view.append(global_map)
+    #projected_features = cv2.resize(
+    #    projected_features,
+    #    depth_map.shape[:2],
+    #    interpolation=cv2.INTER_CUBIC,
+    #)
+    #projected_features /= np.max(projected_features)
+    #projected_features  = cv2.applyColorMap(np.uint8(255 * projected_features), cv2.COLORMAP_JET)
+    #egocentric_view.append(projected_features)
+    #
+    #egocentric_projection = cv2.resize(
+    #    egocentric_projection,
+    #    depth_map.shape[:2],
+    #    interpolation=cv2.INTER_CUBIC,
+    #)
+    #egocentric_view.append(egocentric_projection)
+    #
+    #global_map = cv2.resize(
+    #    global_map,
+    #    depth_map.shape[:2],
+    #    interpolation=cv2.INTER_CUBIC,
+    #)
+    #egocentric_view.append(global_map)
     
     assert (
         len(egocentric_view) > 0
@@ -272,6 +273,10 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray, ego
 
         # scale top down map to align with rgb view
         old_h, old_w, _ = top_down_map.shape
+        if old_h == 0:
+            old_h = 1
+        if old_w == 0:
+            old_w = 1 
         top_down_height = observation_size
         top_down_width = int(float(top_down_height) / old_h * old_w)
         # cv2 resize (dsize is width first)

@@ -168,10 +168,7 @@ class Measurements:
     def update_measures(self, *args: Any, **kwargs: Any) -> None:
         for measure in self.measures.values():
             measure.update_metric(*args, **kwargs)
-        """
-        if self.get_metrics()["sub_success"] and not self.get_metrics()["success"] :
-            self.measures["distance_to_currgoal"].update_metric(*args, **kwargs)
-        """ 
+            
 
     def get_metrics(self) -> Metrics:
         r"""Collects measurement from all `Measure`\ s and returns it

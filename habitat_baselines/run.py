@@ -3,13 +3,19 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+import os
 import sys
 sys.path.insert(0, "")
 import argparse
+import pathlib
 import random
+import datetime
 import numpy as np
+import torch
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.config.default import get_config    
+from utils.log_manager import LogManager
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -70,6 +76,7 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
         config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = 0.5
         config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = 5.0
         config.TASK_CONFIG.SIMULATOR.AGENT_0.HEIGHT = 1.5
+        config.VIDEO_OPTION = []
         if agent_type == "oracle-ego":
             config.TASK_CONFIG.TASK.MEASUREMENTS.append('FOW_MAP')
         config.freeze()
@@ -80,31 +87,61 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
         config.freeze()
         
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
+    
+    #ログファイルの設定   
+    start_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
+    log_manager_train = LogManager()
+    log_manager_train.setLogDirectory("./log/" + start_date + "/train")
+    log_manager_val = LogManager()
+    log_manager_val.setLogDirectory("./log/" + start_date + "/val")
+    
+    
+    device = (
+        torch.device("cuda", config.TORCH_GPU_ID)
+        if torch.cuda.is_available()
+        else torch.device("cpu")
+    )
+    print("-----------------------------------")
+    print("device:" + str(device))
+    print("-----------------------------------")
+    
     trainer = trainer_init(config)
 
     if run_type == "train":
-        trainer.train()
+        trainer.train(log_manager_train, start_date)
     elif run_type == "eval":
-        trainer.eval()
+        trainer.eval(log_manager_val, start_date)
+        
+    end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S')
+    print("Start at " + start_date)
+    print("End at " + end_date)
+    
 
 def test():
     exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo.yaml"
     agent_type = "oracle-ego"
-    run_type = "train"
+    run_type = "eval"
+    start_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
+    datadate = "23-08-18 18-53-17"
+    #datadate = "23-08-18 12-35-30"
     
     config = get_config(exp_config)
+    
+    
     random.seed(config.TASK_CONFIG.SEED)
     np.random.seed(config.TASK_CONFIG.SEED)
     
     config.defrost()
     config.TRAINER_NAME = agent_type
     config.TASK_CONFIG.TRAINER_NAME = agent_type
+    config.CHECKPOINT_FOLDER = "cpt/" + start_date
+    config.EVAL_CKPT_PATH_DIR = "cpt/" + datadate 
     config.freeze()
     
     if agent_type in ["oracle", "oracle-ego", "no-map"]:
         trainer_init = baseline_registry.get_trainer("oracle")
         config.defrost()
-        config.RL.PPO.hidden_size = 512
+        config.RL.PPO.hidden_size = 512 if agent_type=="no-map" else 768
         config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = False
         config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = 0.5
         config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = 5.0
@@ -121,11 +158,34 @@ def test():
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
     trainer = trainer_init(config)
     
+    #ログファイルの設定   
+    log_manager_train = LogManager()
+    log_manager_train.setLogDirectory("./log/" + start_date + "/train")
+    log_manager_val = LogManager()
+    log_manager_val.setLogDirectory("./log/" + start_date + "/val")
+    
+    device = (
+        torch.device("cuda", config.TORCH_GPU_ID)
+        if torch.cuda.is_available()
+        else torch.device("cpu")
+    )
+    print("-----------------------------------")
+    print("device:" + str(device))
+    print("-----------------------------------")
+
     if run_type == "train":
-        trainer.train()
+        #フォルダがない場合は、作成
+        p_dir = pathlib.Path(config.CHECKPOINT_FOLDER)
+        if not p_dir.exists():
+            p_dir.mkdir(parents=True)
+            
+        trainer.train(log_manager_train, start_date)
     elif run_type == "eval":
-        trainer.eval()
-        
+        trainer.eval(log_manager_val, start_date)
+       
+    end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
+    print("Start at " + start_date)
+    print("End at " + end_date)
 
 if __name__ == "__main__":
     #main()

@@ -285,7 +285,7 @@ class HeadingSensor(Sensor):
         return SensorTypes.HEADING
 
     def _get_observation_space(self, *args: Any, **kwargs: Any):
-        return spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float)
+        return spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=float)
 
     def _quat_to_xy_heading(self, quat):
         direction_vector = np.array([0, 0, -1])
@@ -407,7 +407,7 @@ class ProximitySensor(Sensor):
             low=0.0,
             high=self._max_detection_radius,
             shape=(1,),
-            dtype=np.float,
+            dtype=float,
         )
 
     def get_observation(
@@ -447,7 +447,7 @@ class Picture(Measure):
             hasattr(task, "is_found_called")
             and task.is_found_called
         ):
-            #self._metric += 1
+            self._metric = 1
         else:
             self._metric = 0
             
@@ -460,12 +460,14 @@ class CI(Measure):
     ):
         self._sim = sim
         self._config = config
-        #self._num_picture = 0
         super().__init__(**kwargs)
 
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return self.cls_uuid
+    
+    def get_metric(self):
+        return self._metric, self._matrics
 
     def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
         task.measurements.check_measure_dependencies(
@@ -479,10 +481,16 @@ class CI(Measure):
         take_picture = task.measurements.measures[
             Picture.cls_uuid
         ].get_metric()
-
-        #if take_picture > self._num_picture:
-            self._metric = self._calCI(episode, task)
-        #    self._num_picture += 1
+        
+        observation = self._sim.get_observations_at()
+        semantic_obs = self._to_category_id(observation["semantic"])
+        H = semantic_obs.shape[0]
+        W = semantic_obs.shape[1]
+        self._matrics = np.zeros((H, W))
+        if take_picture:
+            measure = self._calCI()
+            self._metric = measure[0]
+            self._matrics = measure[1]
         else:
             self._metric = 0 
             
@@ -504,6 +512,7 @@ class CI(Measure):
         H = semantic_obs.shape[0]
         W = semantic_obs.shape[1]
         size = H * W
+        imp_matrics = np.zeros((H, W))
     
         #objectのスコア別リスト
         #void, wall, floor, door, stairs, ceiling, column, railing
@@ -545,10 +554,11 @@ class CI(Measure):
                 
                 score = w * v / d
                 ci += score
+                imp_matrics[i][j] = score
         
         ci *= len(category)
         ci /= size
-        return ci
+        return ci, imp_matrics
         
 
 @registry.register_measure
@@ -899,30 +909,10 @@ class RawMetrics(Measure):
         self._previous_position = self._sim.get_agent_state().position.tolist()
 
         self._start_end_episode_distance = 0
-        """
-        self._start_subgoal_episode_distance = []
-        self._start_subgoal_agent_distance = []
-   
-        for goal_number in range(len(episode.goals) ):  # Find distances between successive goals and keep adding them
-            if goal_number == 0:
-                self._start_end_episode_distance += self._sim.geodesic_distance(
-                    episode.start_position, episode.goals[0].position
-                )
-                self._start_subgoal_episode_distance.append(self._start_end_episode_distance)
-            else:
-                self._start_end_episode_distance += self._sim.geodesic_distance(
-                    episode.goals[goal_number - 1].position, episode.goals[goal_number].position
-                )
-                self._start_subgoal_episode_distance.append(self._start_end_episode_distance)
-        """
 
         self._agent_episode_distance = 0.0
         self._metric = None
-        """
-        task.measurements.check_measure_dependencies(
-            self.uuid, [EpisodeLength.cls_uuid, MSPL.cls_uuid, PSPL.cls_uuid, DistanceToMultiGoal.cls_uuid, DistanceToCurrGoal.cls_uuid, SubSuccess.cls_uuid, Success.cls_uuid, PercentageSuccess.cls_uuid]
-        )
-        """
+
         self.update_metric(*args, episode=episode, task=task, **kwargs)
         ##
 
@@ -933,34 +923,10 @@ class RawMetrics(Measure):
 
     def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
         current_position = self._sim.get_agent_state().position.tolist()
-        """
-        ep_success = task.measurements.measures[Success.cls_uuid].get_metric()
-        p_success = task.measurements.measures[PercentageSuccess.cls_uuid].get_metric()
-        distance_to_curr_subgoal = task.measurements.measures[DistanceToCurrGoal.cls_uuid].get_metric()
-        ep_sub_success = task.measurements.measures[SubSuccess.cls_uuid].get_metric()
-        """
         self._agent_episode_distance += self._euclidean_distance(
             current_position, self._previous_position
         )
         self._previous_position = current_position
-        """
-        if ep_sub_success:
-            self._start_subgoal_agent_distance.append(self._agent_episode_distance)
-        
-        self._metric = {
-            'success': ep_success,
-            'percentage_success': p_success,
-            'geodesic_distances': self._start_subgoal_episode_distance,
-            'agent_path_length': self._agent_episode_distance,
-            'subgoals_found': task.currGoalIndex,
-            'distance_to_curr_subgoal': distance_to_curr_subgoal,
-            'agent_distances': self._start_subgoal_agent_distance,
-            'distance_to_multi_goal': task.measurements.measures[DistanceToMultiGoal.cls_uuid].get_metric(),
-            'MSPL': task.measurements.measures[MSPL.cls_uuid].get_metric(),
-            'PSPL': task.measurements.measures[PSPL.cls_uuid].get_metric(),
-            'episode_lenth': task.measurements.measures[EpisodeLength.cls_uuid].get_metric()
-        }
-        """
         
         self._metric = {
             'agent_path_length': self._agent_episode_distance,
@@ -1307,11 +1273,11 @@ class TopDownMap(Measure):
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
 
         # draw source and target parts last to avoid overlap
-        self._draw_goals_view_points(episode)
-        self._draw_goals_aabb(episode)
-        self._draw_goals_positions(episode)
+        #self._draw_goals_view_points(episode)
+        #self._draw_goals_aabb(episode)
+        #self._draw_goals_positions(episode)
 
-        self._draw_shortest_path(episode, agent_position)
+        #self._draw_shortest_path(episode, agent_position)
 
         if self._config.DRAW_SOURCE:
             self._draw_point(
@@ -1625,12 +1591,6 @@ class DistanceToMultiGoal(Measure):
 
     def reset_metric(self, episode, task, *args: Any, **kwargs: Any):
         self._metric = None
-        """if self._config.DISTANCE_TO == "VIEW_POINTS":
-            self._episode_view_points = [
-                view_point.agent_state.position
-                # for goal in episode.goals     # Considering only one goal for now
-                for view_point in episode.goals[episode.object_index][0].view_points
-            ]"""
         self.update_metric(*args, episode=episode, task=task, **kwargs)
 
     def update_metric(self, episode, task, *args: Any, **kwargs: Any):

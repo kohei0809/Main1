@@ -145,6 +145,7 @@ def generate_video(
     checkpoint_idx: int,
     metrics: Dict[str, float],
     tb_writer: TensorboardWriter,
+    name_ci = None,
     fps: int = 5,
 ) -> None:
     r"""Generate video according to specified information.
@@ -166,12 +167,18 @@ def generate_video(
         return
 
     metric_strs = []
+    in_metric = ['exp_area', 'ci']
     for k, v in metrics.items():
-        metric_strs.append(f"{k}={v:.2f}")
+        if k in in_metric:
+            metric_strs.append(f"{k}={v:.2f}")
 
-    video_name = f"episode={episode_id}-ckpt={checkpoint_idx}-" + "-".join(
-        metric_strs
-    )
+    if name_ci is None:
+        video_name = f"episode={episode_id}-ckpt={checkpoint_idx}-" + "-".join(
+            metric_strs
+        )
+    else:
+        video_name = f"episode={episode_id}-ckpt={checkpoint_idx}-" + str(name_ci)
+    
     if "disk" in video_option:
         assert video_dir is not None
         images_to_video(images, video_dir, video_name)
@@ -188,7 +195,7 @@ def quat_from_angle_axis(theta: float, axis: np.ndarray) -> np.quaternion:
     :param axis: The axis to rotate about
     :return: The quaternion
     """
-    axis = axis.astype(np.float)
+    axis = axis.astype(float)
     axis /= np.linalg.norm(axis)
     return quaternion.from_rotation_vector(theta * axis)
 
